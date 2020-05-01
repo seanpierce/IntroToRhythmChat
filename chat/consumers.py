@@ -2,12 +2,12 @@ import json
 from datetime import datetime
 from asgiref.sync import async_to_sync
 from channels.generic.websocket import WebsocketConsumer
+from chatmessages.repository import ChatMessageRepository
 
 class ChatConsumer(WebsocketConsumer):
     def connect(self):
         self.room_name = self.scope['url_route']['kwargs']['room_name']
         self.room_group_name = 'chat_%s' % self.room_name
-        self.user = self.scope['user']
 
         # Join room group
         async_to_sync(self.channel_layer.group_add)(
@@ -16,6 +16,7 @@ class ChatConsumer(WebsocketConsumer):
         )
 
         self.accept()
+        self.get_messages()
 
     def disconnect(self, close_code):
         # Leave room group
@@ -29,7 +30,9 @@ class ChatConsumer(WebsocketConsumer):
         text_data_json = json.loads(text_data)
         message = text_data_json['message']
         user = text_data_json['user']
-        time = datetime.now().strftime("%I:%M:%S %p")
+        time = datetime.now().strftime("%I:%M:%S")
+
+        ChatMessageRepository.create_chat_message(user, message, time)
 
         # Send message to room group
         async_to_sync(self.channel_layer.group_send)(
@@ -54,3 +57,17 @@ class ChatConsumer(WebsocketConsumer):
             'user': user,
             'time': time
         }))
+
+    # get initial messages on load
+    def get_messages(self):
+        messages = ChatMessageRepository.get_chat_messages()
+        for message in messages:
+            async_to_sync(self.channel_layer.group_send)(
+                self.room_group_name,
+                {
+                    'type': 'chat_message',
+                    'message': message.content,
+                    'user': message.user,
+                    'time': message.created_at_format
+                }
+            )
