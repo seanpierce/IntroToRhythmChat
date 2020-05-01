@@ -30,7 +30,7 @@ class ChatConsumer(WebsocketConsumer):
         text_data_json = json.loads(text_data)
         message = text_data_json['message']
         user = text_data_json['user']
-        time = datetime.now().strftime("%I:%M:%S")
+        time = self.get_time(datetime.now().strftime("%I:%M %p"))
 
         ChatMessageRepository.create_chat_message(user, message, time)
 
@@ -71,3 +71,8 @@ class ChatConsumer(WebsocketConsumer):
                     'time': message.created_at_format
                 }
             )
+    
+    # formats the message time
+    def get_time(self, input):
+        in_time = datetime.strptime(input, "%I:%M %p")
+        return datetime.strftime(in_time, "%H:%M")
