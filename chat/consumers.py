@@ -2,7 +2,6 @@ import json
 from datetime import datetime
 from asgiref.sync import async_to_sync
 from channels.generic.websocket import WebsocketConsumer
-from chatmessages.repository import ChatMessageRepository
 
 class ChatConsumer(WebsocketConsumer):
     def connect(self):
@@ -16,7 +15,6 @@ class ChatConsumer(WebsocketConsumer):
         )
 
         self.accept()
-        self.get_messages()
 
     def disconnect(self, close_code):
         # Leave room group
@@ -30,9 +28,7 @@ class ChatConsumer(WebsocketConsumer):
         text_data_json = json.loads(text_data)
         message = text_data_json['message']
         user = text_data_json['user']
-        time = self.get_time(datetime.now().strftime("%I:%M %p"))
-
-        ChatMessageRepository.create_chat_message(user, message, time)
+        time = self.get_time()
 
         # Send message to room group
         async_to_sync(self.channel_layer.group_send)(
@@ -57,22 +53,9 @@ class ChatConsumer(WebsocketConsumer):
             'user': user,
             'time': time
         }))
-
-    # get initial messages on load
-    def get_messages(self):
-        messages = ChatMessageRepository.get_chat_messages()
-        for message in messages:
-            async_to_sync(self.channel_layer.group_send)(
-                self.room_group_name,
-                {
-                    'type': 'chat_message',
-                    'message': message.content,
-                    'user': message.user,
-                    'time': message.created_at_format
-                }
-            )
     
     # formats the message time
-    def get_time(self, input):
-        in_time = datetime.strptime(input, "%I:%M %p")
-        return datetime.strftime(in_time, "%H:%M")
+    def get_time(self):
+        now = datetime.now().strftime("%I:%M %p")
+        formatted_time = datetime.strptime(now, "%I:%M %p")
+        return datetime.strftime(formatted_time, "%H:%M")
